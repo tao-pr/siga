@@ -1,0 +1,189 @@
+openapi: 3.0.3
+info:
+  title: Petstore
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/v1
+security:
+  - apiKey: []
+paths:
+  /pets:
+    get:
+      summary: List pets
+      responses:
+        "200":
+          description: A list of pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pet"
+    post:
+      summary: Create a pet
+      security:
+        - oauth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewPet"
+      responses:
+        "200":
+          description: The created pet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /pets/count:
+    get:
+      summary: Count pets
+      responses:
+        "200":
+          description: The number of pets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    minimum: 0
+                    maximum: 10
+  /pets/{petId}:
+    get:
+      summary: Get a pet
+      security:
+        - jwt: []
+      responses:
+        "200":
+          description: The pet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+    put:
+      summary: Replace a pet
+      security:
+        - oauth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewPet"
+      responses:
+        "200":
+          description: The replaced pet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+    delete:
+      summary: Delete a pet
+      security:
+        - oauth: [write, admin]
+      responses:
+        "200":
+          description: Deleted
+  /health:
+    get:
+      summary: Health check without authentication
+      security: []
+      responses:
+        "200":
+          description: The service status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [up]
+components:
+  schemas:
+    Pet:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 100
+        name:
+          type: string
+        status:
+          type: string
+          enum: [available, pending, sold]
+        weight:
+          type: number
+          minimum: 0.5
+          maximum: 80
+        vaccinated:
+          type: boolean
+        tags:
+          type: array
+          minItems: 4
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 1
+            maximum: 6
+        owner:
+          $ref: "#/components/schemas/Owner"
+    NewPet:
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum: [available, pending, sold]
+        tags:
+          type: array
+          items:
+            type: string
+    Owner:
+      type: object
+      properties:
+        name:
+          type: string
+        contacts:
+          type: array
+          items:
+            type: string
+  responses:
+    Unavailable:
+      description: The service is unavailable
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              retryAfter:
+                type: integer
+                minimum: 1
+                maximum: 60
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    oauth:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: http://localhost:8080/token
+          scopes:
+            read: Read pets
+            write: Write pets
+            admin: Administer pets
