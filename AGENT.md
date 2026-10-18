@@ -76,6 +76,7 @@ Siga reads the API spec and opens an API server loop receiving the requests at s
 
 ### Response codes:
 - "200" is default response unless user calls the API with extra convention `?force-error={HTTP_CODE}` then the specific HTTP code will be returned.
+- The extra convention `?force-delay={DURATION}` (e.g. `10ms`, `2s`) makes the server respond after at least that duration. It can be combined with the other conventions, e.g. `?force-auth=read&force-delay=10ms`.
 - Side note, 400 bad request can be naturally emulated by user sending a malformed request which does not comply with the request body spec as discussed in earlier section.
 
 ### Authentications / Authorizations

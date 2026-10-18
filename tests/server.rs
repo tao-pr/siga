@@ -191,3 +191,43 @@ async fn routing() {
         StatusCode::METHOD_NOT_ALLOWED
     );
 }
+
+#[tokio::test]
+async fn force_delay() {
+    let cases = [
+        ("/v1/health?force-delay=50ms", StatusCode::OK),
+        (
+            "/v1/pets/1?force-auth=write,admin&force-delay=50ms",
+            StatusCode::OK,
+        ),
+        (
+            "/v1/pets/1?force-delay=50ms&force-auth=read",
+            StatusCode::UNAUTHORIZED,
+        ),
+        (
+            "/v1/pets/1?force-auth=write,admin&force-error=503&force-delay=50ms",
+            StatusCode::SERVICE_UNAVAILABLE,
+        ),
+    ];
+    for (uri, want) in cases {
+        let method = if uri.starts_with("/v1/pets") {
+            "DELETE"
+        } else {
+            "GET"
+        };
+        let start = std::time::Instant::now();
+        assert_eq!(call(method, uri, &[], "").await.0, want, "{uri}");
+        assert!(
+            start.elapsed() >= std::time::Duration::from_millis(50),
+            "{uri}"
+        );
+    }
+    for bad in ["abc", "10", "-5ms", "1.5s"] {
+        let (status, err) = call("GET", &format!("/v1/health?force-delay={bad}"), &[], "").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{bad}");
+        assert!(
+            err["error"].as_str().unwrap().contains("force-delay"),
+            "{bad}"
+        );
+    }
+}
