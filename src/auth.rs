@@ -1,6 +1,7 @@
 //! Emulated authentication for the security schemes in the spec.
 use crate::spec::Spec;
 use axum::http::HeaderMap;
+use indexmap::IndexSet;
 use openapiv3::{APIKeyLocation, Operation, SecurityScheme};
 use std::collections::HashMap;
 
@@ -9,6 +10,20 @@ pub const VALID_KEY: &str = "my-valid-key";
 
 /// The only bearer token, JWT or not, that passes authentication.
 pub const VALID_TOKEN: &str = "my-valid-token";
+
+/// Describes the authentication `op` needs, e.g. `(auth)` or `(auth:read,write)`, or `None` if it needs none.
+pub fn label(spec: &Spec, op: &Operation) -> Option<String> {
+    let reqs = op.security.as_ref().or(spec.api.security.as_ref())?;
+    if reqs.is_empty() || reqs.iter().any(|r| r.is_empty()) {
+        return None;
+    }
+    let scopes: IndexSet<_> = reqs.iter().flat_map(|r| r.values().flatten()).collect();
+    let scopes: Vec<_> = scopes.into_iter().map(String::as_str).collect();
+    Some(match scopes.is_empty() {
+        true => "(auth)".into(),
+        false => format!("(auth:{})", scopes.join(",")),
+    })
+}
 
 /// Returns whether the request satisfies one of the security requirements of `op`.
 pub fn allowed(
