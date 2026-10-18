@@ -12,7 +12,8 @@ use axum::{
 };
 use openapiv3::{Operation, PathItem};
 use serde_json::Value;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
+use tokio::time::Instant;
 
 /// Builds the router that answers every request from the spec.
 pub fn app(spec: Spec) -> Router {
@@ -33,6 +34,7 @@ pub async fn serve(spec: Spec) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Answers the request, then waits until `force-delay` has passed since it arrived.
 async fn handle(
     State(spec): State<Arc<Spec>>,
     method: Method,
@@ -41,7 +43,31 @@ async fn handle(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    let Some(item) = route(&spec, uri.path()) else {
+    let start = Instant::now();
+    let delay = match query.get("force-delay").map(|d| duration(d)) {
+        None => Duration::ZERO,
+        Some(Some(d)) => d,
+        Some(None) => {
+            return fail(
+                StatusCode::BAD_REQUEST,
+                "force-delay must be a duration such as 10ms or 2s",
+            );
+        }
+    };
+    let res = answer(&spec, &method, &uri, &query, &headers, &body);
+    tokio::time::sleep_until(start + delay).await;
+    res
+}
+
+fn answer(
+    spec: &Spec,
+    method: &Method,
+    uri: &Uri,
+    query: &HashMap<String, String>,
+    headers: &HeaderMap,
+    body: &Bytes,
+) -> Response {
+    let Some(item) = route(spec, uri.path()) else {
         return fail(StatusCode::NOT_FOUND, "the path is not in the spec");
     };
     let Some((_, op)) = item
@@ -53,12 +79,12 @@ async fn handle(
             "the method is not in the spec for this path",
         );
     };
-    if !auth::allowed(&spec, op, &headers, &query) {
+    if !auth::allowed(spec, op, headers, query) {
         return fail(StatusCode::UNAUTHORIZED, "authentication failed");
     }
     if let Some(code) = query.get("force-error") {
         return match code.parse().ok().and_then(|c| StatusCode::from_u16(c).ok()) {
-            Some(code) => reply(&spec, op, code),
+            Some(code) => reply(spec, op, code),
             None => fail(
                 StatusCode::BAD_REQUEST,
                 "force-error must be an HTTP status code",
@@ -68,7 +94,7 @@ async fn handle(
     if let Some((s, required)) = spec.req(op)
         && (required || !body.is_empty())
     {
-        let v = match serde_json::from_slice::<Value>(&body) {
+        let v = match serde_json::from_slice::<Value>(body) {
             Ok(v) => v,
             Err(e) => {
                 return fail(
@@ -77,11 +103,11 @@ async fn handle(
                 );
             }
         };
-        if let Err(e) = schema::check(&spec, s, &v, "body") {
+        if let Err(e) = schema::check(spec, s, &v, "body") {
             return fail(StatusCode::BAD_REQUEST, &e);
         }
     }
-    reply(&spec, op, StatusCode::OK)
+    reply(spec, op, StatusCode::OK)
 }
 
 /// Finds the path item for a request path, preferring literal segments over templates.
@@ -113,4 +139,12 @@ fn reply(spec: &Spec, op: &Operation, code: StatusCode) -> Response {
 
 fn fail(code: StatusCode, msg: &str) -> Response {
     (code, Json(serde_json::json!({ "error": msg }))).into_response()
+}
+
+/// Parses a `force-delay` value such as `10ms` or `2s`.
+fn duration(s: &str) -> Option<Duration> {
+    match s.strip_suffix("ms") {
+        Some(ms) => ms.parse().ok().map(Duration::from_millis),
+        None => s.strip_suffix('s')?.parse().ok().map(Duration::from_secs),
+    }
 }

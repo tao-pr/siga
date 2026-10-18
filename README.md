@@ -132,6 +132,22 @@ Siga looks for a response for that code in the spec. It tries the exact code fir
 
 Siga checks authentication before it applies `force-error`. A request that fails authentication gets 401, whatever code it asks for.
 
+## Forced delays
+
+Add `?force-delay={duration}` to a request to make Siga answer after at least that duration. Write the duration in milliseconds (`10ms`) or whole seconds (`2s`):
+
+```sh
+curl 'http://127.0.0.1:8080/v1/health?force-delay=500ms'
+```
+
+The delay applies to every response, including errors such as 401 and 404. If the value is not a valid duration, Siga returns 400 at once.
+
+You can combine `force-delay` with the other query parameters, in any order:
+
+```sh
+curl -X DELETE 'http://127.0.0.1:8080/v1/pets/1?force-auth=write,admin&force-error=503&force-delay=2s'
+```
+
 ## Request validation
 
 Siga checks the JSON request body against the request body schema. It checks types, required fields, enums, number limits, string length, array length and `uniqueItems`. If the body does not match, Siga returns 400 with the first problem it finds:
