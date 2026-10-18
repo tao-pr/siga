@@ -231,3 +231,27 @@ async fn force_delay() {
         );
     }
 }
+
+#[test]
+fn auth_labels() {
+    let spec = Spec::load(Path::new("tests/data/petstore.yaml")).unwrap();
+    let labels: Vec<_> = spec
+        .api
+        .operations()
+        .map(|(path, method, op)| (method, path, siga::auth::label(&spec, op)))
+        .collect();
+    let want = [
+        ("get", "/pets", Some("(auth)")),
+        ("post", "/pets", Some("(auth:write)")),
+        ("get", "/pets/count", Some("(auth)")),
+        ("get", "/pets/{petId}", Some("(auth)")),
+        ("put", "/pets/{petId}", Some("(auth:write)")),
+        ("delete", "/pets/{petId}", Some("(auth:write,admin)")),
+        ("get", "/health", None),
+    ];
+    let labels: Vec<_> = labels
+        .iter()
+        .map(|(m, p, l)| (*m, *p, l.as_deref()))
+        .collect();
+    assert_eq!(labels, want);
+}

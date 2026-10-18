@@ -45,14 +45,16 @@ Cargo writes the binary to `target/release/siga`.
 
    ```text
    Siga emulates "Petstore" on http://127.0.0.1:8080/v1
-     GET     /v1/pets
-     POST    /v1/pets
-     GET     /v1/pets/count
-     GET     /v1/pets/{petId}
-     PUT     /v1/pets/{petId}
-     DELETE  /v1/pets/{petId}
+     GET     /v1/pets (auth)
+     POST    /v1/pets (auth:write)
+     GET     /v1/pets/count (auth)
+     GET     /v1/pets/{petId} (auth)
+     PUT     /v1/pets/{petId} (auth:write)
+     DELETE  /v1/pets/{petId} (auth:write,admin)
      GET     /v1/health
    ```
+
+   A route that needs authentication ends with `(auth)`. If the route also needs OAuth2 scopes, Siga lists them, for example `(auth:write,admin)`. A route with no label needs no authentication.
 
 4. Send a request from a second terminal:
 

@@ -27,8 +27,9 @@ pub async fn serve(spec: Spec) -> anyhow::Result<()> {
         "Siga emulates {:?} on http://127.0.0.1:{}{}",
         spec.api.info.title, spec.port, spec.base
     );
-    for (path, method, _) in spec.api.operations() {
-        println!("  {:<7} {}{path}", method.to_uppercase(), spec.base);
+    for (path, method, op) in spec.api.operations() {
+        let auth = auth::label(&spec, op).map_or(String::new(), |l| format!(" {l}"));
+        println!("  {:<7} {}{path}{auth}", method.to_uppercase(), spec.base);
     }
     axum::serve(listener, app(spec)).await?;
     Ok(())
