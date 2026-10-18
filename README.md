@@ -156,6 +156,27 @@ Run all the tests:
 cargo test
 ```
 
+## Sample specs
+
+The `samples/` directory contains sample specs, one directory for each API. The test `tests/samples.rs` makes sure that Siga can load each sample.
+
+- `samples/flight/openapi.yaml`: a flight API. GET `/api/flights` lists flights without authentication. PUT `/api/flights/{flight_code}` updates the flight status and needs a JWT bearer token. DELETE `/api/flights/{flight_code}` deletes a flight and needs the OAuth2 scope `privilege`.
+
+Start Siga with the flight sample:
+
+```sh
+cargo run --release -- --api samples/flight/openapi.yaml
+```
+
+Send requests to the flight sample:
+
+```sh
+curl http://127.0.0.1:8080/api/flights
+curl -X PUT -H 'Authorization: Bearer my-valid-token' \
+  -d '{"status": "delayed"}' http://127.0.0.1:8080/api/flights/KL1234
+curl -X DELETE 'http://127.0.0.1:8080/api/flights/KL1234?force-auth=privilege'
+```
+
 ## Project layout
 
 - `src/main.rs`: the command line, with the `--api` flag.
@@ -163,4 +184,5 @@ cargo test
 - `src/schema.rs`: generates random data and validates request bodies.
 - `src/auth.rs`: emulates the authentication schemes.
 - `src/server.rs`: matches routes and answers requests.
-- `tests/`: integration tests and sample specs in `tests/data/`.
+- `tests/`: integration tests, with test specs in `tests/data/`.
+- `samples/`: sample specs, one directory for each API.

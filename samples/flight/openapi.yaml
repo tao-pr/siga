@@ -1,0 +1,128 @@
+openapi: 3.0.3
+info:
+  title: Flight API
+  version: 1.0.0
+  description: Lists flights, updates flight statuses and deletes flights. All times are in CET (UTC+01:00).
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/flights:
+    get:
+      summary: List all flights
+      responses:
+        "200":
+          description: All flights
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Flight"
+                minItems: 10
+                uniqueItems: true
+  /api/flights/{flight_code}:
+    parameters:
+      - name: flight_code
+        in: path
+        required: true
+        description: The flight code, for example KL1234.
+        schema:
+          type: string
+    put:
+      summary: Update the status of a flight
+      security:
+        - jwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdate"
+      responses:
+        "200":
+          description: The updated flight
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flight"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      summary: Delete a flight
+      security:
+        - oauth: [privilege]
+      responses:
+        "200":
+          description: The flight is deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  schemas:
+    Flight:
+      type: object
+      properties:
+        flightCode:
+          type: string
+          description: The flight code, for example KL1234.
+        airlineCode:
+          $ref: "#/components/schemas/AirlineCode"
+        status:
+          $ref: "#/components/schemas/FlightStatus"
+        departureAirport:
+          $ref: "#/components/schemas/AirportCode"
+        arrivalAirport:
+          $ref: "#/components/schemas/AirportCode"
+        departureTime:
+          type: string
+          format: date-time
+          description: The departure time in CET (UTC+01:00).
+        arrivalTime:
+          type: string
+          format: date-time
+          description: The arrival time in CET (UTC+01:00).
+        durationMinutes:
+          type: integer
+          description: The flight duration in minutes.
+          minimum: 30
+          maximum: 900
+    StatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/FlightStatus"
+    FlightStatus:
+      type: string
+      enum: [scheduled, boarding, departed, delayed, cancelled, landed]
+    AirlineCode:
+      type: string
+      description: The IATA airline code.
+      enum: [KL, LH, AF, BA, LX, SK, IB, AZ]
+    AirportCode:
+      type: string
+      description: The IATA airport code.
+      enum: [AMS, FRA, CDG, LHR, ZRH, CPH, MAD, FCO, MUC, VIE]
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+  responses:
+    NotFound:
+      description: No flight has this flight code
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  securitySchemes:
+    jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    oauth:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: http://localhost:8080/oauth/token
+          scopes:
+            privilege: Delete flights
